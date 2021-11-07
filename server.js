@@ -30,17 +30,25 @@ const dataFormat = `${dataHora.getDay()}-${dataHora.getMonth()}-${dataHora.getFu
 const horaFormat = `${dataHora.getHours()}:${dataHora.getMinutes()}:${dataHora.getSeconds()}`;
 const timestamp = `${dataFormat} ${horaFormat}`; 
 
-let nickName = '';
+const allNicks = {};
 
 io.on('connection', (socket) => { // socket
-  const ID_ALEATORIO = socket.id.substring(0, 16);
-  io.emit('newUser', ID_ALEATORIO);
+  allNicks[socket.id] = socket.id.substring(0, 16);
+  io.emit('connectUser', Object.values(allNicks)); // connectUser
+
+  socket.on('nickname', (data) => {
+    allNicks[socket.id] = data;
+    io.emit('connectUser', Object.values(allNicks)); // connectUser
+  });
 
   socket.on('message', async ({ chatMessage, nickname }) => {
-    nickName = nickname || ID_ALEATORIO;
+    await ModelMsg.create({ chatMessage, nickname, timestamp });
+    io.emit('message', `${timestamp} - ${nickname}: ${chatMessage}`); // message
+  });
 
-    await ModelMsg.create({ chatMessage, nickName, timestamp });
-    io.emit('message', `${timestamp} - ${nickName}: ${chatMessage}`);
+  socket.on('disconnect', () => {
+    delete allNicks[socket.id];
+    io.emit('connectUser', Object.values(allNicks)); // disconnectUser
   });
 });
 
